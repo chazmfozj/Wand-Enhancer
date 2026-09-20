@@ -1,0 +1,108 @@
+name: Build Hero1 Android APK
+
+on:
+  push:
+    branches: [hero1-build]
+    paths:
+      - "hero1/**"
+      - ".github/workflows/hero1-android.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout build overlay
+        uses: actions/checkout@v4
+        with:
+          ref: hero1-build
+
+      - name: Checkout WIE
+        uses: actions/checkout@v4
+        with:
+          repository: dlunch/wie
+          ref: main
+          path: wie
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Select Android NDK
+        shell: bash
+        run: |
+          ndk_home=${ANDROID_NDK_LATEST_HOME:-$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)}
+          echo "ANDROID_NDK_HOME=$ndk_home" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ndk_home" >> "$GITHUB_ENV"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown,aarch64-linux-android
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Install Tauri CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli
+
+      - name: Download Hero1 KTF archive
+        shell: bash
+        env:
+          GAME_URL: "https://blog.kakaocdn.net/dna/RZK9r/btqHmy2nAOj/AAAAAAAAAAAAAAAAAAAAAJWr2hpsP2OiVcAQ5DOtD_yjikPGAzjeWAs6EtjfSlSr/%EC%98%81%EC%9B%85%EC%84%9C%EA%B8%B0__1.zip?allow_ip=&allow_referer=&attach=1&credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1790780399&knm=tfile.zip&signature=ommYkwfsOxtFv%2FSv1kr4dXTLz4o%3D"
+        run: |
+          mkdir -p wie/wie-web/src/assets
+          curl -L --fail --retry 3 "$GAME_URL" -o wie/wie-web/src/assets/hero1_game.zip
+          test -s wie/wie-web/src/assets/hero1_game.zip
+          unzip -l wie/wie-web/src/assets/hero1_game.zip | head -40
+
+      - name: Apply standalone Hero1 patches
+        run: python hero1/patch.py wie
+
+      - name: Install frontend dependencies
+        working-directory: wie
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: wie
+        run: npm run build:prod
+
+      - name: Initialize Android project
+        working-directory: wie/wie-app
+        run: cargo tauri android init --ci
+
+      - name: Build debug APK
+        working-directory: wie/wie-app
+        run: |
+          cargo tauri android build --debug --target aarch64 --apk --ci --config '{"build":{"beforeBuildCommand":""}}'
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          set -eux
+          find wie/wie-app/gen/android/app/build/outputs/apk -type f -name '*.apk' -print
+          apk=$(find wie/wie-app/gen/android/app/build/outputs/apk -type f -name '*debug*.apk' -print -quit)
+          if [ -z "$apk" ]; then apk=$(find wie/wie-app/gen/android/app/build/outputs/apk -type f -name '*.apk' -print -quit); fi
+          test -n "$apk"
+          cp "$apk" hero1_soltia_cheat.apk
+          ls -lh hero1_soltia_cheat.apk
+
+      - name: Upload install APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero1-soltia-cheat-apk
+          path: hero1_soltia_cheat.apk
+          if-no-files-found: error
