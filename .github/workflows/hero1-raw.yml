@@ -1,0 +1,37 @@
+name: Publish Hero1 Raw APK
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [hero1-build]
+    paths:
+      - ".github/workflows/hero1-raw.yml"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: hero1-build
+
+      - name: Download compact APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p downloads
+          gh release download hero1-soltia-cheat-compact             -R chazmfozj/Wand-Enhancer             -p 'hero1_soltia_cheat_compact.apk'             -D downloads
+          ls -lh downloads/hero1_soltia_cheat_compact.apk
+          sha256sum downloads/hero1_soltia_cheat_compact.apk
+
+      - name: Commit APK
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f downloads/hero1_soltia_cheat_compact.apk
+          git commit -m "hero1: publish compact APK direct download"
+          git push origin HEAD:hero1-build
