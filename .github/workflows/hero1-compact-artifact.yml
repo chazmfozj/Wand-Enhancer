@@ -1,0 +1,29 @@
+name: Export Compact APK Artifact
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [hero1-build]
+    paths:
+      - ".github/workflows/hero1-compact-artifact.yml"
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download compact release APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          gh release download hero1-soltia-cheat-compact             -R chazmfozj/Wand-Enhancer             -p 'hero1_soltia_cheat_compact.apk'             -D out
+          ls -lh out/hero1_soltia_cheat_compact.apk
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero1-compact-apk-transfer
+          path: out/hero1_soltia_cheat_compact.apk
+          if-no-files-found: error
