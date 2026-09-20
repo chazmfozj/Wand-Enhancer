@@ -14,7 +14,7 @@ def replace_once(text, old, new, label):
 p = Path('wie-app/tauri.conf.json')
 conf = json.loads(read(p))
 conf['productName'] = '영웅서기 1 - 솔티아의 바람'
-conf['identifier'] = 'net.hero1.soltia.cheat'
+conf['identifier'] = 'net.hero1.soltia.originalcheat'
 if 'app' in conf and 'windows' in conf['app'] and conf['app']['windows']:
     conf['app']['windows'][0]['title'] = '영웅서기 1 - 솔티아의 바람'
 write(p, json.dumps(conf, ensure_ascii=False, indent=2) + '\n')
