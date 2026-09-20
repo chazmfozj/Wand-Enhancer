@@ -1,0 +1,35 @@
+name: Export Hero1 APK
+
+permissions:
+  contents: write
+  actions: read
+
+on:
+  push:
+    branches: [hero1-build]
+    paths:
+      - ".github/workflows/hero1-export.yml"
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built APK artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          gh run download 35486750400             -R chazmfozj/Wand-Enhancer             -n hero1-soltia-cheat-apk             -D out
+          find out -maxdepth 2 -type f -ls
+          apk=$(find out -type f -name '*.apk' -print -quit)
+          test -n "$apk"
+          cp "$apk" hero1_soltia_cheat.apk
+          ls -lh hero1_soltia_cheat.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete hero1-soltia-cheat             -R chazmfozj/Wand-Enhancer             --cleanup-tag -y || true
+          gh release create hero1-soltia-cheat             -R chazmfozj/Wand-Enhancer             --target hero1-build             --title "영웅서기1 솔티아 치트 테스트"             --notes "Standalone Android debug build based on WIE."             hero1_soltia_cheat.apk
