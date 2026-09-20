@@ -1,0 +1,114 @@
+name: Build Hero1 Compact APK
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [hero1-build]
+    paths:
+      - ".github/workflows/hero1-compact.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout build overlay
+        uses: actions/checkout@v4
+        with:
+          ref: hero1-build
+
+      - name: Checkout WIE
+        uses: actions/checkout@v4
+        with:
+          repository: dlunch/wie
+          ref: main
+          path: wie
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Select Android NDK
+        shell: bash
+        run: |
+          ndk_home=${ANDROID_NDK_LATEST_HOME:-$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)}
+          echo "ANDROID_NDK_HOME=$ndk_home" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ndk_home" >> "$GITHUB_ENV"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown,aarch64-linux-android
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install build tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack,tauri-cli
+
+      - name: Download Hero1 KTF archive
+        shell: bash
+        env:
+          GAME_URL: "https://blog.kakaocdn.net/dna/RZK9r/btqHmy2nAOj/AAAAAAAAAAAAAAAAAAAAAJWr2hpsP2OiVcAQ5DOtD_yjikPGAzjeWAs6EtjfSlSr/%EC%98%81%EC%9B%85%EC%84%9C%EA%B8%B0__1.zip?allow_ip=&allow_referer=&attach=1&credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1790780399&knm=tfile.zip&signature=ommYkwfsOxtFv%2FSv1kr4dXTLz4o%3D"
+        run: |
+          mkdir -p wie/wie-web/src/assets
+          curl -L --fail --retry 3 "$GAME_URL" -o wie/wie-web/src/assets/hero1_game.zip
+          test -s wie/wie-web/src/assets/hero1_game.zip
+
+      - name: Apply Hero1 patches
+        run: python hero1/patch.py wie
+
+      - name: Build frontend
+        working-directory: wie
+        run: |
+          npm ci
+          npm run build:prod
+
+      - name: Initialize Android project
+        working-directory: wie/wie-app
+        run: cargo tauri android init --ci
+
+      - name: Sign release with Android debug key
+        shell: bash
+        run: |
+          cat >> wie/wie-app/gen/android/app/build.gradle.kts <<'EOF'
+
+          android {
+              buildTypes.getByName("release") {
+                  signingConfig = signingConfigs.getByName("debug")
+              }
+          }
+          EOF
+
+      - name: Build compact APK
+        working-directory: wie/wie-app
+        run: |
+          cargo tauri android build --target aarch64 --apk --ci --config '{"build":{"beforeBuildCommand":""}}'
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          set -eux
+          find wie/wie-app/gen/android/app/build/outputs/apk -type f -name '*.apk' -print
+          apk=$(find wie/wie-app/gen/android/app/build/outputs/apk -type f -name '*release*.apk' -print -quit)
+          test -n "$apk"
+          cp "$apk" hero1_soltia_cheat_compact.apk
+          ls -lh hero1_soltia_cheat_compact.apk
+          sha256sum hero1_soltia_cheat_compact.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete hero1-soltia-cheat-compact -R chazmfozj/Wand-Enhancer --cleanup-tag -y || true
+          gh release create hero1-soltia-cheat-compact             -R chazmfozj/Wand-Enhancer             --target hero1-build             --title "Hero1 Soltia CHEAT Compact"             --notes "Compact signed Android arm64 build."             hero1_soltia_cheat_compact.apk
