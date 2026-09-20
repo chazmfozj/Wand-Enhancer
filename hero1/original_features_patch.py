@@ -108,7 +108,7 @@ write(p, css)
 # TypeScript feature implementation
 p = Path('wie-web/src/ts/app.ts')
 ts = read(p)
-anchor = '''  cheatOpen.addEventListener("pointercancel", (event) => {\n    if (cheatPointerId === event.pointerId) cheatPointerId = null;\n  }, { signal: abortController.signal });\n'''
+anchor = '''  cheatOpen.addEventListener("pointercancel", (event) => { if (cheatPointerId === event.pointerId) cheatPointerId = null; }, { signal: abortController.signal });'''
 if anchor not in ts:
     raise SystemExit('patch failed: cheat drag anchor')
 
