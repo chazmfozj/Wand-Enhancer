@@ -66,6 +66,9 @@ jobs:
       - name: Apply mapping and save features
         run: python hero1/original_features_patch.py wie
 
+      - name: Apply persistent cheat manager
+        run: python hero1/cheat_manager_patch.py wie
+
       - name: Build frontend
         working-directory: wie
         run: |
