@@ -1,0 +1,36 @@
+name: Publish Hero1 Original UI Raw APK
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [hero1-build]
+    paths:
+      - ".github/workflows/hero1-original-ui-raw.yml"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: hero1-build
+
+      - name: Download built APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p downloads
+          gh release download hero1-soltia-original-ui-cheat             -R chazmfozj/Wand-Enhancer             -p 'hero1_soltia_original_ui_cheat.apk'             -D downloads
+          sha256sum downloads/hero1_soltia_original_ui_cheat.apk
+
+      - name: Commit APK
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f downloads/hero1_soltia_original_ui_cheat.apk
+          git commit -m "hero1: publish original UI APK direct download"
+          git push origin HEAD:hero1-build
