@@ -1,5 +1,8 @@
 name: Build Hero1 Android APK
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [hero1-build]
@@ -99,6 +102,15 @@ jobs:
           test -n "$apk"
           cp "$apk" hero1_soltia_cheat.apk
           ls -lh hero1_soltia_cheat.apk
+
+      - name: Publish APK to build branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f hero1_soltia_cheat.apk
+          git commit -m "hero1: publish install APK" || true
+          git push origin HEAD:hero1-build
 
       - name: Upload install APK
         uses: actions/upload-artifact@v4
